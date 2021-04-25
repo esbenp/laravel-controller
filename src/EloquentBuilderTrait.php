@@ -12,6 +12,12 @@ use Illuminate\Support\Str;
 trait EloquentBuilderTrait
 {
     /**
+     * Array of joins
+     * @var array
+     */
+    protected $brunoJoins = [];
+
+    /**
      * Apply resource options to a query builder
      * @param  Builder $queryBuilder
      * @param  array  $options
@@ -279,7 +285,8 @@ trait EloquentBuilderTrait
             $type = 'inner';
 
             if ($relation instanceof BelongsTo) {
-                $queryBuilder->join(
+                $this->joinRelatedModelIfNotJoined(
+                    $queryBuilder,
                     $relation->getRelated()->getTable(),
                     $relation->getQualifiedForeignKeyName(),
                     '=',
@@ -287,14 +294,16 @@ trait EloquentBuilderTrait
                     $type
                 );
             } elseif ($relation instanceof BelongsToMany) {
-                $queryBuilder->join(
+                $this->joinRelatedModelIfNotJoined(
+                    $queryBuilder,
                     $relation->getTable(),
                     $relation->getQualifiedParentKeyName(),
                     '=',
                     $relation->getQualifiedForeignPivotKeyName(),
                     $type
                 );
-                $queryBuilder->join(
+                $this->joinRelatedModelIfNotJoined(
+                    $queryBuilder,
                     $relation->getRelated()->getTable(),
                     $relation->getRelated()->getTable().'.'.$relation->getRelated()->getKeyName(),
                     '=',
@@ -302,7 +311,8 @@ trait EloquentBuilderTrait
                     $type
                 );
             } else {
-                $queryBuilder->join(
+                $this->joinRelatedModelIfNotJoined(
+                    $queryBuilder,
                     $relation->getRelated()->getTable(),
                     $relation->getQualifiedParentKeyName(),
                     '=',
@@ -314,5 +324,34 @@ trait EloquentBuilderTrait
             $table = $model->getTable();
             $queryBuilder->select(sprintf('%s.*', $table));
         }
+    }
+
+    /**
+     * Join related model if not joined
+     *
+     * @param Builder $queryBuilder
+     * @param string $relatedTable
+     * @param string $foreignKeyName
+     * @param string $operator
+     * @param string $ownerKeyName
+     * @param string $type
+     */
+    private function joinRelatedModelIfNotJoined(
+        Builder $queryBuilder,
+        string $relatedTable,
+        string $foreignKeyName,
+        string $operator,
+        string $ownerKeyName,
+        string $type
+    ) {
+        $key = sprintf('%s%s%s%s%s', $relatedTable, $foreignKeyName, $operator, $ownerKeyName, $type);
+
+        if (array_key_exists($key, $this->brunoJoins)) {
+            return;
+        }
+
+        $this->brunoJoins[$key] = true;
+
+        $queryBuilder->join($relatedTable, $foreignKeyName, $operator, $ownerKeyName, $type);
     }
 }
